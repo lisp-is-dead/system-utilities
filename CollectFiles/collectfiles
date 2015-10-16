@@ -1,0 +1,84 @@
+#!/usr/bin/ruby
+
+require 'fileutils'
+require 'find'
+
+version = '0.1.0'
+count = 0
+
+def collect_file(path, location)
+	type = File.extname(path)[1..-1]
+	target = "#{location}/#{type}"
+	unless test(?d, target)
+		Dir.mkdir(target)
+	end
+	FileUtils.cp path, target
+end
+
+USAGE = <<ENDUSAGE
+Usage:
+	collectfiles [-h] [-v] [-s source] destination
+ENDUSAGE
+
+HELP = <<ENDHELP
+	-h, --help	Show this help.
+	-v, --version	Show the version number
+	-s, --source	Specify the source directory (default: CWD)
+ENDHELP
+
+ARGS = { :source=>Dir.pwd, :destination=>File.absolute_path(ARGV[-1]) }
+
+next_arg = false
+next_eat = false
+ARGV.each do |arg|
+	case arg
+		when '-h', '--help' then ARGS[:help] = true
+		when '-v', '--version' then ARGS[:version] = true
+		when '-s', '--source'
+			next_arg = :source
+			next_eat = true
+		else
+			if next_eat
+				ARGS[next_arg] = arg
+				next_eat = false
+			end
+	end
+end
+
+puts "CollectFiles v#{version}" if ARGS[:version]
+
+def exit_early(message)
+	puts message
+	puts USAGE
+	exit
+end
+
+if ARGS[:help] or not ARGS[:destination]
+	exit_early HELP
+end
+
+if not FileTest.directory?(ARGS[:source])
+	exit_early "Invalid source directory!"
+end
+
+if not FileTest.directory?(ARGS[:destination])
+	exit_early "Invalid destination directory!"
+end
+
+puts "Source: " + ARGS[:source]
+puts "Destination: " + ARGS[:destination]
+
+Find.find(ARGS[:source]) do |path|
+	# skip special and hidden files/folders
+	if File.basename(path)[0] == ?.
+		Find.prune
+	end
+	
+	if FileTest.file?(path)
+		collect_file(path, ARGS[:destination])
+		count += 1
+	end
+end
+
+puts "Process completed."
+puts "Collected #{count} files."
